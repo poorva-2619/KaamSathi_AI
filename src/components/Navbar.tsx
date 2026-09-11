@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, User, Sparkles } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -74,6 +75,7 @@ export const Navbar: React.FC = () => {
                 </span>
                 <span className="sm:hidden">Profile</span>
               </Link>
+              <NotificationBell />
 
               <button
                 onClick={handleSignOut}
