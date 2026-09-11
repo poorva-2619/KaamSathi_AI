@@ -65,7 +65,7 @@ export const jobsService = {
     if (error) throw error;
     return data as JobRow;
   },
-};
+
 
 
   /** Get all jobs created by a specific provider */
@@ -99,3 +99,4 @@ export const jobsService = {
     if (error) throw error;
     return count ?? 0;
   },
+};
