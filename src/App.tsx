@@ -23,6 +23,10 @@ import { FindJobs } from './pages/service-provider/FindJobs';
 import { JobDetails } from './pages/service-provider/JobDetails';
 import { Profile as ServiceProviderProfile } from './pages/service-provider/Profile';
 
+// Chat Pages
+import { ChatList } from './pages/ChatList';
+import { ChatThread } from './pages/ChatThread';
+
 // Placeholder screen for placeholder routes
 const ComingSoonScreen: React.FC<{ title: string; subtitle?: string }> = ({
   title,
@@ -77,10 +81,8 @@ export function App() {
                 path="/home"
                 element={<ComingSoonScreen title="Home Feed" subtitle="Unified home stream coming soon." />}
               />
-              <Route
-                path="/chat"
-                element={<ComingSoonScreen title="Messages & Chat" subtitle="Direct communication with workers coming soon." />}
-              />
+              <Route path="/chat" element={<ChatList />} />
+              <Route path="/chat/:jobId/:counterpartId" element={<ChatThread />} />
               <Route
                 path="/profile"
                 element={<ComingSoonScreen title="User Profile" subtitle="Account and preferences management coming soon." />}

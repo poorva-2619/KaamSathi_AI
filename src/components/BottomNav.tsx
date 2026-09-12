@@ -15,7 +15,10 @@ export const BottomNav: React.FC = () => {
   const profilePath = role === 'job_provider' ? '/job-provider/profile' : '/service-provider/profile';
   const chatPath = '/chat';
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) =>
+    path === chatPath
+      ? location.pathname.startsWith(chatPath)
+      : location.pathname === path;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-2.5 px-8 flex justify-around items-center z-40 shadow-lg md:hidden pb-[max(0.625rem,env(safe-area-inset-bottom))]">
