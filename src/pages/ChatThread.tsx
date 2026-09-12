@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { chatService, type Message } from '../../services/chat';
+import { useAuth } from '../context/AuthContext';
+import { chatService, type Message } from '../services/chat';
 import { formatDistanceToNow } from 'date-fns';
 
 interface LocationState {

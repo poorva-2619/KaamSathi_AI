@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, ChevronRight, Clock } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { chatService, type Conversation } from '../../services/chat';
+import { useAuth } from '../context/AuthContext';
+import { chatService, type Conversation } from '../services/chat';
 import { formatDistanceToNow } from 'date-fns';
 
 export const ChatList: React.FC = () => {
