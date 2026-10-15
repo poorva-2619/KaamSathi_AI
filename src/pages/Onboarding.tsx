@@ -89,7 +89,9 @@ export const Onboarding: React.FC = () => {
   // Prepopulate form if existing profile fields exist
   useEffect(() => {
     if (profile) {
-      if (profile.full_name) setFullName(profile.full_name);
+      if (profile.full_name && profile.full_name.trim() !== 'New User') {
+        setFullName(profile.full_name);
+      }
       if (profile.phone) setPhone(profile.phone);
       if (profile.address) {
         setAddress(profile.address);
@@ -405,16 +407,14 @@ export const Onboarding: React.FC = () => {
             </div>
 
             {/* LOCATION SELECTOR: 2 Options (Use Current Location or Manual Location with Instant Suggestions) */}
+            {/* LOCATION SELECTOR: 2 Option buttons + Single Bar Beneath */}
             <div className="pt-2">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  {t('location', 'Location')} <span className="text-red-500">*</span>
-                </label>
-                <span className="text-[11px] text-slate-500">Choose preferred method</span>
-              </div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                {t('location', 'Location')} <span className="text-red-500">*</span>
+              </label>
 
-              {/* 2-Option Tabs: Current Location vs Manual Location */}
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-3">
+              {/* 2-Option Tabs: Use Current Location vs Manual Location */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-2.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -448,81 +448,55 @@ export const Onboarding: React.FC = () => {
                 </button>
               </div>
 
-              {/* OPTION 1: Current Location Display */}
-              {locationMode === 'current' && (
-                <div className="p-4 bg-orange-50/70 border border-orange-100 rounded-2xl">
-                  {isDetectingLocation ? (
-                    <div className="flex items-center gap-3 text-xs text-primary-800 font-semibold py-1">
-                      <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
-                      <span>Detecting your real-world locality and address via GPS...</span>
+              {/* Single Bar Beneath Both Buttons */}
+              <div className="relative" ref={suggestionsRef}>
+                {locationMode === 'current' ? (
+                  /* Current Location: Detected location written directly into the bar */
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      readOnly
+                      value={
+                        isDetectingLocation
+                          ? 'Detecting your current location...'
+                          : address || selectedLocationLabel || ''
+                      }
+                      placeholder="Click 'Use Current Location' to detect GPS"
+                      onClick={() => {
+                        if (!address && !isDetectingLocation) {
+                          handleDetectCurrentLocation();
+                        }
+                      }}
+                      className="w-full h-11 pl-10 pr-24 bg-orange-50/50 border border-orange-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none cursor-pointer"
+                    />
+                    <div className="absolute left-3.5 text-primary-600 pointer-events-none">
+                      {isDetectingLocation ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
                     </div>
-                  ) : selectedLocationLabel || address ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-900">
-                              {selectedLocationLabel || address}
-                            </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
-                              GPS Active
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Real-time location linked for nearby job recommendations.
-                          </p>
-                        </div>
-                      </div>
 
+                    {/* Right side badge / re-detect button */}
+                    <div className="absolute right-2.5 flex items-center gap-1.5">
+                      {address && !isDetectingLocation && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>GPS</span>
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={handleDetectCurrentLocation}
-                        className="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline shrink-0"
+                        disabled={isDetectingLocation}
+                        className="px-2 py-1 text-primary-600 hover:text-primary-700 hover:bg-orange-100 rounded-lg transition-colors text-xs font-semibold"
                       >
-                        Re-detect
+                        {isDetectingLocation ? '...' : 'Re-detect'}
                       </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-orange-100 text-primary-700 flex items-center justify-center shrink-0">
-                          <MapPin className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-bold text-slate-900">
-                            Allow Location Access
-                          </h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            Tap below to automatically detect your neighbourhood.
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleDetectCurrentLocation}
-                        className="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-                      >
-                        Detect Location
-                      </button>
-                    </div>
-                  )}
-
-                  {locationStatus && !isDetectingLocation && (
-                    <p className="text-[11px] font-medium text-emerald-700 mt-2 border-t border-orange-100/60 pt-1.5 flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>{locationStatus}</span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* OPTION 2: Manual Location with Instant Typing Suggestions Dropdown */}
-              {locationMode === 'manual' && (
-                <div className="relative" ref={suggestionsRef}>
+                  </div>
+                ) : (
+                  /* Manual Location: Type directly into the bar with instant suggestions */
                   <div className="relative">
                     <input
                       type="text"
@@ -533,7 +507,7 @@ export const Onboarding: React.FC = () => {
                           setShowSuggestions(true);
                         }
                       }}
-                      placeholder="Start typing your area or city (e.g. Malviya Nagar, Andheri East, Saket)..."
+                      placeholder="Type your area or city (e.g. Malviya Nagar, Andheri East, Saket)..."
                       className="w-full h-11 pl-10 pr-9 bg-slate-50 focus:bg-white border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent rounded-xl text-sm text-slate-900 placeholder:text-slate-400 transition-all"
                     />
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
@@ -543,6 +517,8 @@ export const Onboarding: React.FC = () => {
                         type="button"
                         onClick={() => {
                           setManualQuery('');
+                          setAddress('');
+                          setSelectedLocationLabel('');
                           setSuggestions([]);
                           setShowSuggestions(false);
                         }}
@@ -552,56 +528,50 @@ export const Onboarding: React.FC = () => {
                       </button>
                     )}
                   </div>
+                )}
 
-                  {/* Suggestions Popover / Dropdown */}
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100 animate-in fade-in-50 slide-in-from-top-1 duration-150">
-                      <div className="px-3.5 py-1.5 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Matching Areas & Localities
-                      </div>
-                      {suggestions.map((item) => (
-                        <button
-                          key={item.name}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(item)}
-                          className="w-full px-4 py-2.5 text-left hover:bg-orange-50/80 transition-colors flex items-center justify-between group"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <MapPin className="w-4 h-4 text-primary-600 shrink-0 group-hover:scale-110 transition-transform" />
-                            <div>
-                              <div className="text-xs font-semibold text-slate-900">
-                                {item.name}
-                              </div>
-                              {item.subtitle && (
-                                <div className="text-[11px] text-slate-500">
-                                  {item.subtitle}
-                                </div>
-                              )}
+                {/* Suggestions Popover / Dropdown (for Manual mode) */}
+                {locationMode === 'manual' && showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100 animate-in fade-in-50 slide-in-from-top-1 duration-150">
+                    <div className="px-3.5 py-1.5 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Matching Areas & Localities
+                    </div>
+                    {suggestions.map((item) => (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(item)}
+                        className="w-full px-4 py-2.5 text-left hover:bg-orange-50/80 transition-colors flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <MapPin className="w-4 h-4 text-primary-600 shrink-0 group-hover:scale-110 transition-transform" />
+                          <div>
+                            <div className="text-xs font-semibold text-slate-900">
+                              {item.name}
                             </div>
+                            {item.subtitle && (
+                              <div className="text-[11px] text-slate-500">
+                                {item.subtitle}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-[11px] font-semibold text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Select →
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                        </div>
+                        <span className="text-[11px] font-semibold text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          Select →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                  {/* Selected indicator */}
-                  {selectedLocationLabel && (
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Location set to: <strong>{selectedLocationLabel}</strong></span>
-                    </div>
-                  )}
-
-                  {locationStatus && !selectedLocationLabel && (
-                    <p className="text-[11px] font-medium text-primary-700 mt-1.5">
-                      {locationStatus}
-                    </p>
-                  )}
-                </div>
-              )}
+                {/* Status message */}
+                {locationStatus && (
+                  <p className="text-[11px] font-medium text-emerald-700 mt-1.5 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{locationStatus}</span>
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
