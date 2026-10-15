@@ -147,76 +147,52 @@ export const Onboarding: React.FC = () => {
     );
   };
 
-  // Option 1: Detect Current Location via Geolocation API with IP fallback
-  const handleDetectCurrentLocation = async () => {
+  // Option 1: Detect Current Location via High-Accuracy Geolocation API
+  const handleDetectCurrentLocation = () => {
     setLocationMode('current');
     setIsDetectingLocation(true);
-    setLocationStatus('');
+    setLocationStatus('Requesting GPS permission from browser...');
 
-    let detectedCoords: { lat: number; lng: number } | null = null;
-
-    // 1. Try browser GPS
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 5000,
-            enableHighAccuracy: false,
-          });
-        });
-        detectedCoords = {
-          lat: Math.round(position.coords.latitude * 10000) / 10000,
-          lng: Math.round(position.coords.longitude * 10000) / 10000,
-        };
-      } catch (err) {
-        console.warn('Browser GPS permission not granted or timeout:', err);
-      }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setIsDetectingLocation(false);
+      setLocationMode('manual');
+      setLocationStatus('Geolocation is not supported by your browser. Please type your location.');
+      return;
     }
 
-    // If browser GPS succeeded, reverse-geocode to area/city
-    if (detectedCoords) {
-      setLat(detectedCoords.lat);
-      setLng(detectedCoords.lng);
-      try {
-        const resolvedPlace = await reverseGeocode(detectedCoords.lat, detectedCoords.lng);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const detectedLat = Math.round(position.coords.latitude * 10000) / 10000;
+        const detectedLng = Math.round(position.coords.longitude * 10000) / 10000;
+        setLat(detectedLat);
+        setLng(detectedLng);
+
+        setLocationStatus('Resolving your exact address...');
+        const resolvedPlace = await reverseGeocode(detectedLat, detectedLng);
         setAddress(resolvedPlace);
         setSelectedLocationLabel(resolvedPlace);
         setManualQuery(resolvedPlace);
         setIsDetectingLocation(false);
-        setLocationStatus('Location detected successfully via GPS!');
-        return;
-      } catch {
-        // Fallback below
-      }
-    }
-
-    // 2. Fallback: Fast IP location (resolves city/region if desktop GPS is blocked)
-    try {
-      const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.city) {
-          const placeName = `${data.city}, ${data.region || data.country_name || 'India'}`;
-          const ipLat = parseFloat(data.latitude) || 28.6139;
-          const ipLng = parseFloat(data.longitude) || 77.2090;
-          setLat(ipLat);
-          setLng(ipLng);
-          setAddress(placeName);
-          setSelectedLocationLabel(placeName);
-          setManualQuery(placeName);
-          setIsDetectingLocation(false);
-          setLocationStatus('Approximate location detected from network.');
-          return;
+        setLocationStatus('Exact GPS location detected!');
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        setIsDetectingLocation(false);
+        setLocationMode('manual');
+        if (err.code === 1) {
+          setLocationStatus('GPS permission blocked in browser. Please type your area or city.');
+        } else if (err.code === 3) {
+          setLocationStatus('GPS request timed out. Please type your area or city.');
+        } else {
+          setLocationStatus('GPS unavailable. Please type your area or city.');
         }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
       }
-    } catch {
-      // Fallback
-    }
-
-    // 3. If both fail: switch to manual mode so user can type freely
-    setIsDetectingLocation(false);
-    setLocationMode('manual');
-    setLocationStatus('Location access not available. Please type your area or city below.');
+    );
   };
 
   // Option 2: Search Manual Location (Instant Autocomplete as user types)

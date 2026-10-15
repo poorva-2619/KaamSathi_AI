@@ -183,8 +183,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     // Network / timeout fallback to nearest known location
   }
 
-  // 2. Fallback: find nearest known location in our database using simple Euclidean/Haversine approx
-  let nearestName = 'Delhi NCR, India';
+  // 2. Fallback: find nearest known location in our database
+  let nearestName = '';
   let minDiff = Infinity;
 
   for (const [name, info] of Object.entries(POPULAR_LOCATIONS)) {
@@ -197,5 +197,10 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     }
   }
 
-  return nearestName;
+  // Only return nearest known preset if reasonably close (within ~30 km)
+  if (minDiff < 0.1 && nearestName) {
+    return nearestName;
+  }
+
+  return `Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
 }
