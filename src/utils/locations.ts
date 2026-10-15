@@ -128,3 +128,74 @@ export function resolveLocation(query: string): LatLng | null {
 export function getKnownLocationNames(): string[] {
   return Object.keys(POPULAR_LOCATIONS);
 }
+
+/**
+ * Reverse geocode latitude and longitude to a human-readable Indian locality or city.
+ * 1. Tries OpenStreetMap reverse geocoding for real street/suburb/city names.
+ * 2. Falls back to nearest known Indian city in POPULAR_LOCATIONS.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  // 1. Try free OpenStreetMap Nominatim reverse geocoding with timeout
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.address) {
+        const addr = data.address;
+        const locality =
+          addr.suburb ||
+          addr.neighbourhood ||
+          addr.residential ||
+          addr.city_district ||
+          addr.quarter ||
+          addr.road ||
+          '';
+        const city =
+          addr.city ||
+          addr.town ||
+          addr.village ||
+          addr.county ||
+          addr.state_district ||
+          '';
+        const state = addr.state || '';
+
+        const parts = [locality, city, state].filter(Boolean);
+        if (parts.length > 0) {
+          return parts.slice(0, 2).join(', ');
+        }
+        if (data.display_name) {
+          return data.display_name.split(',').slice(0, 2).join(', ').trim();
+        }
+      }
+    }
+  } catch {
+    // Network / timeout fallback to nearest known location
+  }
+
+  // 2. Fallback: find nearest known location in our database using simple Euclidean/Haversine approx
+  let nearestName = 'Delhi NCR, India';
+  let minDiff = Infinity;
+
+  for (const [name, info] of Object.entries(POPULAR_LOCATIONS)) {
+    const dLat = lat - info.lat;
+    const dLng = lng - info.lng;
+    const distSq = dLat * dLat + dLng * dLng;
+    if (distSq < minDiff) {
+      minDiff = distSq;
+      nearestName = name;
+    }
+  }
+
+  return nearestName;
+}

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { profilesService } from '../services/profiles';
 import { parseProfileMeta, formatProfileMeta, isProfileComplete } from '../utils/profileMeta';
-import { searchLocationSuggestions, type LocationSuggestion, resolveLocation } from '../utils/locations';
+import { searchLocationSuggestions, type LocationSuggestion, resolveLocation, reverseGeocode } from '../utils/locations';
 import { Loading } from '../components/Loading';
 import {
   MapPin,
@@ -157,17 +157,18 @@ export const Onboarding: React.FC = () => {
     setLocationStatus('Detecting your GPS location...');
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const detectedLat = Math.round(position.coords.latitude * 10000) / 10000;
         const detectedLng = Math.round(position.coords.longitude * 10000) / 10000;
         setLat(detectedLat);
         setLng(detectedLng);
+
+        setLocationStatus('Finding your area address...');
+        const resolvedPlace = await reverseGeocode(detectedLat, detectedLng);
+        setSelectedLocationLabel(resolvedPlace);
+        setAddress(resolvedPlace);
         setIsDetectingLocation(false);
-        setSelectedLocationLabel('Current Device GPS Location');
         setLocationStatus('Current location detected successfully!');
-        if (!address) {
-          setAddress('Current Location');
-        }
       },
       (err) => {
         console.warn('Geolocation error:', err);
@@ -449,39 +450,73 @@ export const Onboarding: React.FC = () => {
 
               {/* OPTION 1: Current Location Display */}
               {locationMode === 'current' && (
-                <div className="p-4 bg-orange-50/70 border border-orange-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center shrink-0 mt-0.5">
-                      <MapPin className="w-5 h-5" />
+                <div className="p-4 bg-orange-50/70 border border-orange-100 rounded-2xl">
+                  {isDetectingLocation ? (
+                    <div className="flex items-center gap-3 text-xs text-primary-800 font-semibold py-1">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
+                      <span>Detecting your real-world locality and address via GPS...</span>
                     </div>
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900">
-                        {selectedLocationLabel || address || 'GPS Location'}
-                      </h3>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        {locationStatus || 'Device location active for nearby job matching.'}
-                      </p>
-                    </div>
-                  </div>
+                  ) : selectedLocationLabel || address ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">
+                              {selectedLocationLabel || address}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+                              GPS Active
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Real-time location linked for nearby job recommendations.
+                          </p>
+                        </div>
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={handleDetectCurrentLocation}
-                    disabled={isDetectingLocation}
-                    className="self-start sm:self-auto px-3.5 py-1.5 bg-white hover:bg-orange-100 border border-orange-200 text-primary-700 text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
-                  >
-                    {isDetectingLocation ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Detecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Detect GPS</span>
-                      </>
-                    )}
-                  </button>
+                      <button
+                        type="button"
+                        onClick={handleDetectCurrentLocation}
+                        className="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline shrink-0"
+                      >
+                        Re-detect
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-orange-100 text-primary-700 flex items-center justify-center shrink-0">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900">
+                            Allow Location Access
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Tap below to automatically detect your neighbourhood.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleDetectCurrentLocation}
+                        className="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                      >
+                        Detect Location
+                      </button>
+                    </div>
+                  )}
+
+                  {locationStatus && !isDetectingLocation && (
+                    <p className="text-[11px] font-medium text-emerald-700 mt-2 border-t border-orange-100/60 pt-1.5 flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{locationStatus}</span>
+                    </p>
+                  )}
                 </div>
               )}
 
