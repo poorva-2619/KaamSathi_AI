@@ -147,38 +147,76 @@ export const Onboarding: React.FC = () => {
     );
   };
 
-  // Option 1: Detect Current Location via Geolocation API
-  const handleDetectCurrentLocation = () => {
+  // Option 1: Detect Current Location via Geolocation API with IP fallback
+  const handleDetectCurrentLocation = async () => {
     setLocationMode('current');
-    if (!navigator.geolocation) {
-      setLocationStatus('Geolocation is not supported by your browser. Please choose Manual Location.');
-      return;
+    setIsDetectingLocation(true);
+    setLocationStatus('');
+
+    let detectedCoords: { lat: number; lng: number } | null = null;
+
+    // 1. Try browser GPS
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 5000,
+            enableHighAccuracy: false,
+          });
+        });
+        detectedCoords = {
+          lat: Math.round(position.coords.latitude * 10000) / 10000,
+          lng: Math.round(position.coords.longitude * 10000) / 10000,
+        };
+      } catch (err) {
+        console.warn('Browser GPS permission not granted or timeout:', err);
+      }
     }
 
-    setIsDetectingLocation(true);
-    setLocationStatus('Detecting your GPS location...');
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const detectedLat = Math.round(position.coords.latitude * 10000) / 10000;
-        const detectedLng = Math.round(position.coords.longitude * 10000) / 10000;
-        setLat(detectedLat);
-        setLng(detectedLng);
-
-        setLocationStatus('Finding your area address...');
-        const resolvedPlace = await reverseGeocode(detectedLat, detectedLng);
-        setSelectedLocationLabel(resolvedPlace);
+    // If browser GPS succeeded, reverse-geocode to area/city
+    if (detectedCoords) {
+      setLat(detectedCoords.lat);
+      setLng(detectedCoords.lng);
+      try {
+        const resolvedPlace = await reverseGeocode(detectedCoords.lat, detectedCoords.lng);
         setAddress(resolvedPlace);
+        setSelectedLocationLabel(resolvedPlace);
+        setManualQuery(resolvedPlace);
         setIsDetectingLocation(false);
-        setLocationStatus('Current location detected successfully!');
-      },
-      (err) => {
-        console.warn('Geolocation error:', err);
-        setIsDetectingLocation(false);
-        setLocationStatus('Could not access GPS. Please choose Manual Location.');
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+        setLocationStatus('Location detected successfully via GPS!');
+        return;
+      } catch {
+        // Fallback below
+      }
+    }
+
+    // 2. Fallback: Fast IP location (resolves city/region if desktop GPS is blocked)
+    try {
+      const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.city) {
+          const placeName = `${data.city}, ${data.region || data.country_name || 'India'}`;
+          const ipLat = parseFloat(data.latitude) || 28.6139;
+          const ipLng = parseFloat(data.longitude) || 77.2090;
+          setLat(ipLat);
+          setLng(ipLng);
+          setAddress(placeName);
+          setSelectedLocationLabel(placeName);
+          setManualQuery(placeName);
+          setIsDetectingLocation(false);
+          setLocationStatus('Approximate location detected from network.');
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    // 3. If both fail: switch to manual mode so user can type freely
+    setIsDetectingLocation(false);
+    setLocationMode('manual');
+    setLocationStatus('Location access not available. Please type your area or city below.');
   };
 
   // Option 2: Search Manual Location (Instant Autocomplete as user types)
@@ -450,88 +488,56 @@ export const Onboarding: React.FC = () => {
 
               {/* Single Bar Beneath Both Buttons */}
               <div className="relative" ref={suggestionsRef}>
-                {locationMode === 'current' ? (
-                  /* Current Location: Detected location written directly into the bar */
-                  <div className="relative flex items-center">
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        isDetectingLocation
-                          ? 'Detecting your current location...'
-                          : address || selectedLocationLabel || ''
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      handleManualSearchChange(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (address.trim().length > 0) {
+                        handleManualSearchChange(address);
                       }
-                      placeholder="Click 'Use Current Location' to detect GPS"
-                      onClick={() => {
-                        if (!address && !isDetectingLocation) {
-                          handleDetectCurrentLocation();
-                        }
-                      }}
-                      className="w-full h-11 pl-10 pr-24 bg-orange-50/50 border border-orange-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none cursor-pointer"
-                    />
-                    <div className="absolute left-3.5 text-primary-600 pointer-events-none">
-                      {isDetectingLocation ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <MapPin className="w-4 h-4" />
-                      )}
-                    </div>
+                    }}
+                    placeholder={
+                      isDetectingLocation
+                        ? 'Detecting your location...'
+                        : 'Type your area or city (e.g. Malviya Nagar, Andheri East, Saket)...'
+                    }
+                    className="w-full h-11 pl-10 pr-9 bg-slate-50 focus:bg-white border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent rounded-xl text-sm text-slate-900 placeholder:text-slate-400 transition-all"
+                  />
 
-                    {/* Right side badge / re-detect button */}
-                    <div className="absolute right-2.5 flex items-center gap-1.5">
-                      {address && !isDetectingLocation && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>GPS</span>
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleDetectCurrentLocation}
-                        disabled={isDetectingLocation}
-                        className="px-2 py-1 text-primary-600 hover:text-primary-700 hover:bg-orange-100 rounded-lg transition-colors text-xs font-semibold"
-                      >
-                        {isDetectingLocation ? '...' : 'Re-detect'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Manual Location: Type directly into the bar with instant suggestions */
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={manualQuery}
-                      onChange={(e) => handleManualSearchChange(e.target.value)}
-                      onFocus={() => {
-                        if (manualQuery.trim().length > 0) {
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      placeholder="Type your area or city (e.g. Malviya Nagar, Andheri East, Saket)..."
-                      className="w-full h-11 pl-10 pr-9 bg-slate-50 focus:bg-white border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent rounded-xl text-sm text-slate-900 placeholder:text-slate-400 transition-all"
-                    />
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
-
-                    {manualQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManualQuery('');
-                          setAddress('');
-                          setSelectedLocationLabel('');
-                          setSuggestions([]);
-                          setShowSuggestions(false);
-                        }}
-                        className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 p-0.5"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                  {/* Left Icon */}
+                  <div className="absolute left-3.5 top-3.5 pointer-events-none text-primary-600">
+                    {isDetectingLocation ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <MapPin className="w-4 h-4" />
                     )}
                   </div>
-                )}
 
-                {/* Suggestions Popover / Dropdown (for Manual mode) */}
-                {locationMode === 'manual' && showSuggestions && suggestions.length > 0 && (
+                  {/* Clear button if text is present */}
+                  {address && !isDetectingLocation && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddress('');
+                        setManualQuery('');
+                        setSelectedLocationLabel('');
+                        setSuggestions([]);
+                        setShowSuggestions(false);
+                      }}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Suggestions Popover / Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
                   <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden divide-y divide-slate-100 animate-in fade-in-50 slide-in-from-top-1 duration-150">
                     <div className="px-3.5 py-1.5 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Matching Areas & Localities
@@ -566,8 +572,8 @@ export const Onboarding: React.FC = () => {
 
                 {/* Status message */}
                 {locationStatus && (
-                  <p className="text-[11px] font-medium text-emerald-700 mt-1.5 flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <p className="text-[11px] font-medium text-slate-600 mt-1.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 inline-block" />
                     <span>{locationStatus}</span>
                   </p>
                 )}
