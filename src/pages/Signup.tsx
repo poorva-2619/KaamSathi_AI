@@ -4,15 +4,17 @@ import { authService } from '../services/auth';
 import { profilesService } from '../services/profiles';
 import type { UserRole } from '../types/database.types';
 import { Briefcase, UserCheck, Loader2, AlertCircle } from 'lucide-react';
+import { BackButton } from '../components/BackButton';
+import { useTranslation } from 'react-i18next';
 
 export const Signup: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
-  const initialRole: UserRole =
+  const role: UserRole =
     searchParams.get('role') === 'job_provider' ? 'job_provider' : 'service_provider';
 
-  const [role, setRole] = useState<UserRole>(initialRole);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,7 +69,7 @@ export const Signup: React.FC = () => {
       await profilesService.createBareProfile(user.id, role, '');
 
       // 3. Redirect to onboarding
-      navigate('/onboarding', { replace: true });
+      navigate('/onboarding', { replace: true, state: { role } });
     } catch (err: unknown) {
       console.error('Signup error:', err);
       const message = err instanceof Error ? err.message : 'Failed to create account.';
@@ -85,48 +87,28 @@ export const Signup: React.FC = () => {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
-      <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-card">
+      <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-card relative">
+        <div className="absolute top-4 left-4">
+          <BackButton to="/" />
+        </div>
         
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 mt-2">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Create Account
+            {t('createAccount')}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Join <span className="font-semibold text-primary-600">KaamSathi AI</span> to get started
+            {t('joinDescription')}
           </p>
         </div>
 
-        {/* Role Selection Tabs */}
-        <div className="mb-6">
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-            Select Your Role
-          </label>
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setRole('job_provider')}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
-                role === 'job_provider'
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              <span>Job Provider</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRole('service_provider')}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
-                role === 'service_provider'
-                  ? 'bg-white text-primary-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Service Worker</span>
-            </button>
+        {/* Read-Only Role Badge */}
+        <div className="mb-6 flex justify-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('signingUpAs')}</span>
+            <div className={`flex items-center gap-1.5 text-sm font-bold ${role === 'job_provider' ? 'text-primary-700' : 'text-slate-700'}`}>
+              {role === 'job_provider' ? <Briefcase className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+              <span>{role === 'job_provider' ? t('jobProvider') : t('serviceWorker')}</span>
+            </div>
           </div>
         </div>
 
@@ -143,13 +125,13 @@ export const Signup: React.FC = () => {
           {/* Email Field */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Email Address
+              {t('emailAddress')}
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('emailPlaceholder')}
               disabled={loading}
               className={`w-full h-11 px-3.5 bg-slate-50 focus:bg-white border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
                 emailError
@@ -165,7 +147,7 @@ export const Signup: React.FC = () => {
           {/* Password Field */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Password
+              {t('password')}
             </label>
             <input
               type="password"
@@ -187,7 +169,7 @@ export const Signup: React.FC = () => {
           {/* Confirm Password Field */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Confirm Password
+              {t('confirmPassword')}
             </label>
             <input
               type="password"
@@ -215,19 +197,19 @@ export const Signup: React.FC = () => {
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Creating Account...</span>
+                <span>{t('creatingAccount')}</span>
               </>
             ) : (
-              <span>Sign Up as {role === 'job_provider' ? 'Job Provider' : 'Service Worker'}</span>
+              <span>{t('signUpAs', { role: role === 'job_provider' ? t('jobProvider') : t('serviceWorker') })}</span>
             )}
           </button>
 
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          Already have an account?{' '}
+          {t('alreadyAccount')}{' '}
           <Link to="/login" className="text-primary-600 font-semibold hover:underline">
-            Log in
+            {t('logIn')}
           </Link>
         </div>
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { profilesService } from '../services/profiles';
 import { parseProfileMeta, formatProfileMeta } from '../utils/profileMeta';
 import { Loading } from '../components/Loading';
 import { MapPin, Briefcase, UserCheck, Loader2, Check, AlertCircle, HeartPulse, Wrench } from 'lucide-react';
+import { BackButton } from '../components/BackButton';
+import { useTranslation } from 'react-i18next';
 
 const SPEC_SKILLS = [
   'House Cleaning',
@@ -31,7 +33,9 @@ const ACCESSIBILITY_PREFERENCES = [
 
 export const Onboarding: React.FC = () => {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
@@ -76,7 +80,8 @@ export const Onboarding: React.FC = () => {
     );
   }
 
-  const role = profile?.role || 'service_provider';
+  const signupRole = (location.state as { role?: 'job_provider' | 'service_provider' } | null)?.role;
+  const role = profile?.role ?? signupRole ?? 'service_provider';
 
   const toggleSkill = (skill: string) => {
     setSkills((prev) =>
@@ -183,22 +188,25 @@ export const Onboarding: React.FC = () => {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 bg-slate-50 pb-24 md:pb-8">
-      <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-card">
+      <div className="max-w-2xl mx-auto bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-card relative">
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6">
+          <BackButton />
+        </div>
         
         {/* Title Header */}
         <div className="text-center mb-8">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 border border-orange-200 text-primary-800 text-xs font-bold rounded-full mb-3">
             {role === 'job_provider' ? <Briefcase className="w-3.5 h-3.5 text-primary-600" /> : <UserCheck className="w-3.5 h-3.5 text-primary-600" />}
-            <span>{role === 'job_provider' ? 'Job Provider Onboarding' : 'Worker Onboarding'}</span>
+            <span>{role === 'job_provider' ? t('jobProviderOnboarding') : t('workerOnboarding')}</span>
           </span>
 
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Complete Profile Setup
+            {t('completeProfile')}
           </h1>
           <p className="mt-2 text-sm text-slate-500 max-w-md mx-auto">
             {role === 'job_provider'
-              ? 'Provide your details to start posting and hiring local workers.'
-              : 'Add your skills and work preferences for instant AI job matching.'}
+              ? t('providerOnboardingDescription')
+              : t('workerOnboardingDescription')}
           </p>
         </div>
 
@@ -215,13 +223,13 @@ export const Onboarding: React.FC = () => {
           {/* Section 1: Basic Information */}
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b pb-2">
-              1. Basic Information
+              {t('basicInformation')}
             </h2>
 
             {/* Name */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Full Name <span className="text-red-500">*</span>
+                  {t('fullName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -237,7 +245,7 @@ export const Onboarding: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Age <span className="text-red-500">*</span>
+                  {t('age')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -253,7 +261,7 @@ export const Onboarding: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Gender <span className="text-red-500">*</span>
+                  {t('gender')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={gender}
@@ -272,7 +280,7 @@ export const Onboarding: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t('phoneNumber')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -286,7 +294,7 @@ export const Onboarding: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Address / City <span className="text-red-500">*</span>
+                  {t('addressCity')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -301,8 +309,8 @@ export const Onboarding: React.FC = () => {
 
           </div>
 
-          {/* Location GPS Pin Section */}
-          <div className="space-y-3 bg-orange-50/60 p-4 border border-orange-100 rounded-2xl">
+          {/* Location GPS Pin Section for service providers only */}
+          {role === 'service_provider' && <div className="space-y-3 bg-orange-50/60 p-4 border border-orange-100 rounded-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary-600" />
@@ -347,7 +355,7 @@ export const Onboarding: React.FC = () => {
             {locationStatus && (
               <p className="text-[11px] font-medium text-primary-700 mt-1">{locationStatus}</p>
             )}
-          </div>
+          </div>}
 
           {/* Section 2: Service Worker Role Specific Fields */}
           {role === 'service_provider' && (
@@ -457,10 +465,10 @@ export const Onboarding: React.FC = () => {
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Saving Profile...</span>
+                <span>{t('savingProfile')}</span>
               </>
             ) : (
-              <span>Complete Setup & Go to Home →</span>
+              <span>{t('completeSetup')}</span>
             )}
           </button>
 

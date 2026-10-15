@@ -1,13 +1,18 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { notificationsService } from '../services/notifications';
 import { Bell } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import type { Database } from '../types/database.types';
+import { useTranslation } from 'react-i18next';
 
 export const NotificationBell: React.FC = () => {
-  const { session } = useAuth();
-  const userId = session?.user?.id;
-  const [notifications, setNotifications] = useState<Array<any>>([]);
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const userId = user?.id;
+  const [notifications, setNotifications] = useState<Database['public']['Tables']['notifications']['Row'][]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -41,10 +46,18 @@ export const NotificationBell: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleMarkRead = async (id: string) => {
-    await notificationsService.markAsRead(id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
-    setUnreadCount((c) => Math.max(c - 1, 0));
+  const handleNotificationClick = async (notification: Database['public']['Tables']['notifications']['Row']) => {
+    if (!notification.is_read) {
+      await notificationsService.markAsRead(notification.id);
+      setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n)));
+      setUnreadCount((c) => Math.max(c - 1, 0));
+    }
+    setDropdownOpen(false);
+    if (notification.job_id) {
+      navigate(notification.type === 'new_job'
+        ? '/service-provider/find-jobs'
+        : '/job-provider/my-jobs');
+    }
   };
 
   const badge = () => {
@@ -60,7 +73,7 @@ export const NotificationBell: React.FC = () => {
       <button
         className="relative p-2 rounded-xl text-slate-600 hover:text-primary-600 hover:bg-orange-50 transition-colors"
         onClick={() => setDropdownOpen((o) => !o)}
-        aria-label="Notifications"
+        aria-label={t('notifications')}
       >
         <Bell className="w-5 h-5" />
         {badge()}
@@ -68,13 +81,13 @@ export const NotificationBell: React.FC = () => {
       {dropdownOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-20">
           {notifications.length === 0 && (
-            <div className="p-4 text-sm text-slate-500">No notifications</div>
+            <div className="p-4 text-sm text-slate-500">{t('noNotifications')}</div>
           )}
           {notifications.map((n) => (
             <div
               key={n.id}
               className={`p-3 cursor-pointer hover:bg-slate-50 flex justify-between items-start ${n.is_read ? '' : 'bg-orange-50'}`}
-              onClick={() => handleMarkRead(n.id)}
+              onClick={() => handleNotificationClick(n)}
             >
               <div className="flex flex-col">
                 <span className="font-medium text-slate-800">{n.title}</span>

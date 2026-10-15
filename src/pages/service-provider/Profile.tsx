@@ -16,6 +16,7 @@ import {
   HeartPulse,
   Check,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const SPEC_SKILLS = [
   'House Cleaning',
@@ -42,6 +43,7 @@ const ACCESSIBILITY_PREFERENCES = [
 
 export const Profile: React.FC = () => {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { t } = useTranslation();
 
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -188,7 +190,7 @@ export const Profile: React.FC = () => {
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-xl shadow-md transition-all flex items-center gap-1.5"
                 >
                   <Edit3 className="w-4 h-4" />
-                  <span>Edit Profile</span>
+                  <span>{t('editProfile')}</span>
                 </button>
               )}
             </div>
@@ -353,7 +355,7 @@ export const Profile: React.FC = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      <span>Save Changes</span>
+                      <span>{t('saveChanges')}</span>
                     </>
                   )}
                 </button>

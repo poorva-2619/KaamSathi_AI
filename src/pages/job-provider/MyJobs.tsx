@@ -48,10 +48,10 @@ const JobCard: React.FC<{ job: JobRow; onAccept: () => void }> = ({ job, onAccep
   const handleAccept = async (applicationId: string) => {
     setAccepting(applicationId);
     setAcceptError(null);
-    const { data, error } = await supabase.rpc('accept_job_application', {
-      p_application_id: applicationId,
-      p_job_id: job.id,
-    });
+    const { data, error } = await (supabase.rpc(
+      'accept_job_application' as never,
+      { p_application_id: applicationId, p_job_id: job.id } as never,
+    ) as unknown as Promise<{ data: { success: boolean; error?: string } | null; error: { message: string } | null }>);
     setAccepting(null);
     if (error || !data?.success) {
       setAcceptError(data?.error ?? error?.message ?? 'Failed to accept. Try again.');

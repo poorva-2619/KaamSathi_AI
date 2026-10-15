@@ -69,7 +69,7 @@ export function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 pb-20">
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Landing />} />
@@ -81,8 +81,6 @@ export function App() {
                 path="/home"
                 element={<ComingSoonScreen title="Home Feed" subtitle="Unified home stream coming soon." />}
               />
-              <Route path="/chat" element={<ChatList />} />
-              <Route path="/chat/:jobId/:counterpartId" element={<ChatThread />} />
               <Route
                 path="/profile"
                 element={<ComingSoonScreen title="User Profile" subtitle="Account and preferences management coming soon." />}
@@ -91,18 +89,26 @@ export function App() {
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/chat" element={<ChatList />} />
+                <Route path="/chat/:jobId/:counterpartId" element={<ChatThread />} />
 
                 {/* Job Provider Portal */}
-                <Route path="/job-provider" element={<JobProviderHome />} />
-                <Route path="/job-provider/post-job" element={<PostJob />} />
-                <Route path="/job-provider/my-jobs" element={<MyJobs />} />
-                <Route path="/job-provider/profile" element={<JobProviderProfile />} />
+                <Route element={<ProtectedRoute allowedRole="job_provider" />}>
+                  <Route path="/job-provider" element={<JobProviderHome />} />
+                  <Route path="/job-provider/home" element={<JobProviderHome />} />
+                  <Route path="/job-provider/post-job" element={<PostJob />} />
+                  <Route path="/job-provider/my-jobs" element={<MyJobs />} />
+                  <Route path="/job-provider/profile" element={<JobProviderProfile />} />
+                </Route>
 
                 {/* Service Provider Portal */}
-                <Route path="/service-provider" element={<ServiceProviderHome />} />
-                <Route path="/service-provider/find-jobs" element={<FindJobs />} />
-                <Route path="/service-provider/job/:id" element={<JobDetails />} />
-                <Route path="/service-provider/profile" element={<ServiceProviderProfile />} />
+                <Route element={<ProtectedRoute allowedRole="service_provider" />}>
+                  <Route path="/service-provider" element={<ServiceProviderHome />} />
+                  <Route path="/service-provider/home" element={<ServiceProviderHome />} />
+                  <Route path="/service-provider/find-jobs" element={<FindJobs />} />
+                  <Route path="/service-provider/job/:id" element={<JobDetails />} />
+                  <Route path="/service-provider/profile" element={<ServiceProviderProfile />} />
+                </Route>
               </Route>
 
               {/* Catch-all 404 */}

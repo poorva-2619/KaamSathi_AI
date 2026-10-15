@@ -63,6 +63,32 @@ export const jobsService = {
       .single();
 
     if (error) throw error;
+    const createdJob = data as JobRow;
+
+    // Notify every worker in one batch so dashboards receive the INSERT via Realtime.
+    try {
+      const { data: providers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'service_provider');
+
+      if (providers && providers.length > 0) {
+        const notifications = providers.map((p) => ({
+          user_id: (p as { id: string }).id,
+          job_id: createdJob.id,
+          type: 'new_job',
+          title: 'New Job Available',
+          message: `New job available: ${createdJob.title} - ${createdJob.address ?? 'your area'}`,
+        }));
+
+        if (notifications.length > 0) {
+          // @ts-ignore - Supabase type inference helper
+          await supabase.from('notifications').insert(notifications);
+        }
+      }
+    } catch (notifErr) {
+      console.error('Failed to send new job notifications:', notifErr);
+    }
     return data as JobRow;
   },
 

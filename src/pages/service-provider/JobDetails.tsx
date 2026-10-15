@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, MapPin, IndianRupee, Tag, AlertTriangle, CheckCircle,
-  Loader2, FileText, Send, RefreshCw
+  MapPin, IndianRupee, Tag, AlertTriangle, CheckCircle,
+  Loader2, FileText, Send
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { jobsService, type JobRow } from '../../services/jobs';
 import { supabase } from '../../services/supabase';
+import { BackButton } from '../../components/BackButton';
 
 const WAGE_TYPE_LABEL: Record<string, string> = {
   daily: 'per day', hourly: 'per hour', fixed: 'fixed price',
@@ -47,12 +48,12 @@ export const JobDetails: React.FC = () => {
   // Check if user already applied
   useEffect(() => {
     if (!user?.id || !id) { setCheckingApplication(false); return; }
-    supabase
+    (supabase
       .from('applications')
       .select('status')
       .eq('job_id', id)
       .eq('worker_id', user.id)
-      .maybeSingle()
+      .maybeSingle() as unknown as Promise<{ data: { status: string } | null; error: unknown }>)
       .then(({ data }) => {
         if (data) setExistingStatus(data.status);
         setCheckingApplication(false);
@@ -63,17 +64,21 @@ export const JobDetails: React.FC = () => {
     if (!user?.id || !id) return;
     setApplying(true);
     setApplyError(null);
-    const { error } = await supabase
-      .from('applications')
-      .insert({ job_id: id, worker_id: user.id, cover_note: coverNote.trim() || null });
+    const { data, error } = await (supabase.rpc as any)('accept_job', {
+      p_job_id: id,
+      p_worker_id: user.id,
+      p_cover_note: coverNote.trim() || null,
+    });
     if (error) {
-      if (error.code === '23505') {
-        setApplyError('You have already applied for this job.');
-      } else {
-        setApplyError(error.message ?? 'Failed to apply. Please try again.');
-      }
-    } else {
+      setApplyError('Something went wrong, please try again');
+    } else if ((data as any)?.conflict) {
+      setApplyError('Sorry, this job was already taken by someone else.');
+      window.setTimeout(() => navigate('/service-provider/find-jobs'), 2000);
+    } else if ((data as any)?.success) {
       setApplied(true);
+      setExistingStatus('accepted');
+    } else {
+      setApplyError((data as any)?.error ?? 'Something went wrong, please try again');
     }
     setApplying(false);
   };
@@ -85,9 +90,7 @@ export const JobDetails: React.FC = () => {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col">
         <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-1.5 rounded-xl hover:bg-slate-100">
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
+          <BackButton />
           <div className="h-5 w-32 bg-slate-200 rounded animate-pulse" />
         </div>
         <div className="p-4 space-y-4">
@@ -107,9 +110,7 @@ export const JobDetails: React.FC = () => {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col">
         <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-1.5 rounded-xl hover:bg-slate-100">
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
+          <BackButton />
           <h1 className="font-semibold text-slate-900">Job Details</h1>
         </div>
         <div className="flex-1 flex items-center justify-center p-6">
@@ -135,9 +136,7 @@ export const JobDetails: React.FC = () => {
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 pt-5 pb-4 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
-        </button>
+        <BackButton />
         <div className="flex-1 min-w-0">
           <h1 className="font-bold text-slate-900 truncate">{job.title}</h1>
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -256,7 +255,7 @@ export const JobDetails: React.FC = () => {
                     ? 'The provider has selected you for this job.'
                     : existingStatus === 'rejected'
                     ? 'The provider went with another candidate.'
-                    : 'You'll be notified when the provider reviews your application.'}
+                    : "You'll be notified when the provider reviews your application."}
                 </p>
                 {existingStatus === 'accepted' && (
                   <button

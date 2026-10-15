@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send } from 'lucide-react';
+import { useParams, useLocation } from 'react-router-dom';
+import { Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { chatService, type Message } from '../services/chat';
 import { formatDistanceToNow } from 'date-fns';
+import { BackButton } from '../components/BackButton';
 
 interface LocationState {
   jobTitle?: string;
@@ -13,12 +14,14 @@ interface LocationState {
 export const ChatThread: React.FC = () => {
   const { jobId, counterpartId } = useParams<{ jobId: string; counterpartId: string }>();
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const state = (location.state as LocationState) ?? {};
   const jobTitle = state.jobTitle ?? 'Job Chat';
   const counterpartName = state.counterpartName ?? 'User';
+
+  const isSupport = jobId === 'support';
+  const actualJobId = isSupport ? null : jobId;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -45,7 +48,7 @@ export const ChatThread: React.FC = () => {
     if (!jobId) return;
     const load = async () => {
       setLoading(true);
-      const data = await chatService.getMessages(jobId);
+      const data = await chatService.getMessages(jobId, isSupport);
       seenIds.current = new Set(data.map((m) => m.id));
       setMessages(data);
       setLoading(false);
@@ -56,7 +59,7 @@ export const ChatThread: React.FC = () => {
   // Subscribe to realtime (or polling fallback)
   useEffect(() => {
     if (!jobId) return;
-    const unsubscribe = chatService.subscribeToMessages(jobId, (newMsg) => {
+    const unsubscribe = chatService.subscribeToMessages(jobId, isSupport, (newMsg) => {
       appendMessage(newMsg);
     });
     return unsubscribe;
@@ -81,14 +84,14 @@ export const ChatThread: React.FC = () => {
       id: `optimistic-${Date.now()}`,
       sender_id: user.id,
       receiver_id: counterpartId,
-      job_id: jobId,
+      job_id: actualJobId ?? null,
       content: text,
       created_at: new Date().toISOString(),
     };
     seenIds.current.add(optimisticMsg.id);
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    const saved = await chatService.sendMessage(user.id, counterpartId, jobId, text);
+    const saved = await chatService.sendMessage(user.id, counterpartId, actualJobId ?? null, text);
     setSending(false);
 
     if (saved) {
@@ -119,13 +122,7 @@ export const ChatThread: React.FC = () => {
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shrink-0 shadow-sm">
-        <button
-          onClick={() => navigate('/chat')}
-          className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
-          aria-label="Back to chat list"
-        >
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
-        </button>
+        <BackButton to="/chat" />
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-slate-900 text-sm truncate">{counterpartName}</div>
           <div className="text-xs text-primary-600 truncate">{jobTitle}</div>

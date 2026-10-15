@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { profilesService } from '../services/profiles';
+import { isProfileComplete } from '../utils/profileMeta';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { BackButton } from '../components/BackButton';
+import { useTranslation } from 'react-i18next';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,17 +58,21 @@ export const Login: React.FC = () => {
       const profile = await profilesService.getProfile(user.id);
 
       // 3. Check profile completeness & redirect
-      if (!profile || !profile.full_name || profile.full_name.trim() === '') {
+      if (!profile || !isProfileComplete(profile)) {
         navigate('/onboarding', { replace: true });
       } else {
-        // Redirect to target path or role home
+        // Preserve a pending destination only when it belongs to this user's role.
         const fromPath = (location.state as { from?: { pathname: string } })?.from?.pathname;
-        if (fromPath && fromPath !== '/login' && fromPath !== '/signup') {
+        const roleHome = profile.role === 'job_provider' ? '/job-provider' : '/service-provider';
+        const rolePrefix = `${roleHome}/`;
+        const canOpenFromPath = fromPath && (
+          fromPath === roleHome || fromPath.startsWith(rolePrefix) || fromPath === '/chat'
+        );
+
+        if (canOpenFromPath && fromPath !== '/login' && fromPath !== '/signup') {
           navigate(fromPath, { replace: true });
-        } else if (profile.role === 'job_provider') {
-          navigate('/job-provider', { replace: true });
         } else {
-          navigate('/service-provider', { replace: true });
+          navigate(roleHome, { replace: true });
         }
       }
     } catch (err: unknown) {
@@ -82,14 +90,17 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
-      <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-card">
-        
-        <div className="text-center mb-6">
+      <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-card relative">
+        <div className="absolute top-4 left-4">
+          <BackButton />
+        </div>
+
+        <div className="text-center mb-6 mt-2">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Welcome Back
+            {t('welcomeBack')}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Sign in to access your <span className="font-semibold text-primary-600">KaamSathi AI</span> account
+            {t('signInDescription')}
           </p>
         </div>
 
@@ -106,13 +117,13 @@ export const Login: React.FC = () => {
           {/* Email Field */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Email Address
+              {t('emailAddress')}
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('emailPlaceholder')}
               disabled={loading}
               className={`w-full h-11 px-3.5 bg-slate-50 focus:bg-white border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
                 emailError
@@ -129,14 +140,14 @@ export const Login: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-slate-700">
-                Password
+                {t('password')}
               </label>
             </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={t('passwordPlaceholder')}
               disabled={loading}
               className={`w-full h-11 px-3.5 bg-slate-50 focus:bg-white border rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all ${
                 passwordError
@@ -158,19 +169,19 @@ export const Login: React.FC = () => {
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Signing in...</span>
+                <span>{t('signingIn')}</span>
               </>
             ) : (
-              <span>Sign In</span>
+              <span>{t('logIn')}</span>
             )}
           </button>
 
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          Don't have an account yet?{' '}
+          {t('alreadyAccount')}{' '}
           <Link to="/signup" className="text-primary-600 font-semibold hover:underline">
-            Create an account
+            {t('createAccount')}
           </Link>
         </div>
 

@@ -11,7 +11,7 @@
 -- Profiles Table
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('job_provider', 'service_provider')),
+    role TEXT NOT NULL CHECK (role IN ('job_provider', 'service_provider', 'admin')),
     full_name TEXT NOT NULL,
     phone TEXT,
     avatar_url TEXT,
@@ -123,12 +123,7 @@ ON public.jobs FOR SELECT TO authenticated
 USING (
     status = 'open'
     OR provider_id = auth.uid()
-    OR EXISTS (
-        SELECT 1 FROM public.applications
-        WHERE applications.job_id = jobs.id
-        AND applications.worker_id = auth.uid()
-        AND applications.status = 'accepted'
-    )
+    OR public.has_accepted_application(id)
 );
 
 DROP POLICY IF EXISTS "Providers can create jobs" ON public.jobs;
@@ -152,11 +147,7 @@ CREATE POLICY "Applications viewable by worker and job provider"
 ON public.applications FOR SELECT TO authenticated
 USING (
     worker_id = auth.uid()
-    OR EXISTS (
-        SELECT 1 FROM public.jobs
-        WHERE jobs.id = applications.job_id
-        AND jobs.provider_id = auth.uid()
-    )
+    OR public.is_job_provider(job_id)
 );
 
 DROP POLICY IF EXISTS "Workers can apply to jobs" ON public.applications;
@@ -169,11 +160,7 @@ CREATE POLICY "Providers or workers can update application"
 ON public.applications FOR UPDATE TO authenticated
 USING (
     worker_id = auth.uid()
-    OR EXISTS (
-        SELECT 1 FROM public.jobs
-        WHERE jobs.id = applications.job_id
-        AND jobs.provider_id = auth.uid()
-    )
+    OR public.is_job_provider(job_id)
 );
 
 -- Notifications Policies

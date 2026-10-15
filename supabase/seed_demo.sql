@@ -15,8 +15,8 @@
 
 DO $$
 DECLARE
-  v_provider_id UUID := '00000000-0000-0000-0000-000000000001'; -- REPLACE with real provider UUID
-  v_worker_id   UUID := '00000000-0000-0000-0000-000000000002'; -- REPLACE with real worker UUID
+  v_provider_id UUID := '80cd872a-7178-4e2a-8f0b-cf33fde0ee5b'; -- REPLACE with real provider UUID
+  v_worker_id   UUID := '87269baf-a005-4984-bb3f-e7500e3901f3'; -- REPLACE with real worker UUID
 
   -- Malviya Nagar, New Delhi (lat/lng used in F5 lookup table)
   v_lat_mn  DOUBLE PRECISION := 28.5355;

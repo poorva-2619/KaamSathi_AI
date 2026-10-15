@@ -144,12 +144,15 @@ export const chatService = {
   },
 
   /** Fetch all messages for a job thread, ordered oldest → newest */
-  async getMessages(jobId: string): Promise<Message[]> {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('created_at', { ascending: true });
+  async getMessages(jobId: string, isSupport: boolean = false): Promise<Message[]> {
+    const query = supabase.from('messages').select('*');
+    if (isSupport) {
+      query.is('job_id', null);
+    } else {
+      query.eq('job_id', jobId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: true });
 
     if (error) {
       console.error('Failed to fetch messages:', error);
@@ -162,13 +165,13 @@ export const chatService = {
   async sendMessage(
     senderId: string,
     receiverId: string,
-    jobId: string,
+    jobId: string | null,
     content: string,
   ): Promise<Message | null> {
     const { data, error } = await supabase
       .from('messages')
       // @ts-ignore
-        .insert({ sender_id: senderId, receiver_id: receiverId, job_id: jobId, content })
+      .insert({ sender_id: senderId, receiver_id: receiverId, job_id: jobId, content })
       .select()
       .single();
 
@@ -181,25 +184,26 @@ export const chatService = {
 
   /**
    * Subscribe to new messages for a job via Supabase Realtime.
-   * Returns an unsubscribe function.
-   * Falls back to polling every 5 s if the channel fails to connect.
    */
   subscribeToMessages(
     jobId: string,
+    isSupport: boolean,
     onNewMessage: (msg: Message) => void,
   ): () => void {
     let pollingInterval: ReturnType<typeof setInterval> | null = null;
     let lastSeenAt = new Date().toISOString();
 
+    const filterStr = isSupport ? 'job_id=is.null' : `job_id=eq.${jobId}`;
+
     const channel = supabase
-      .channel(`public:messages:job_${jobId}`)
+      .channel(isSupport ? `public:messages:support` : `public:messages:job_${jobId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `job_id=eq.${jobId}`,
+          filter: filterStr,
         },
         (payload) => {
           onNewMessage(payload.new as Message);
@@ -211,12 +215,18 @@ export const chatService = {
           console.warn('[Chat] Realtime unavailable, falling back to 5s polling.');
           if (!pollingInterval) {
             pollingInterval = setInterval(async () => {
-              const { data } = await supabase
+              const query = supabase
                 .from('messages')
                 .select('*')
-                .eq('job_id', jobId)
-                .gt('created_at', lastSeenAt)
-                .order('created_at', { ascending: true });
+                .gt('created_at', lastSeenAt);
+              
+              if (isSupport) {
+                query.is('job_id', null);
+              } else {
+                query.eq('job_id', jobId);
+              }
+                
+              const { data } = await query.order('created_at', { ascending: true });
 
               if (data && data.length > 0) {
                 for (const msg of data as Message[]) {

@@ -10,7 +10,7 @@ export type UserRole = 'job_provider' | 'service_provider';
 export type WageType = 'daily' | 'hourly' | 'fixed';
 export type JobStatus = 'open' | 'assigned' | 'completed' | 'cancelled';
 export type ApplicationStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
-export type NotificationType = 'job_application' | 'job_accepted' | 'job_rejected' | 'chat' | 'system';
+export type NotificationType = 'new_job' | 'job_accepted' | 'job_application' | 'job_rejected' | 'chat' | 'system';
 
 export interface Database {
   public: {
@@ -154,6 +154,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          job_id: string | null;
           title: string;
           message: string;
           type: NotificationType;
@@ -164,6 +165,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          job_id?: string | null;
           title: string;
           message: string;
           type: NotificationType;
@@ -174,6 +176,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          job_id?: string | null;
           title?: string;
           message?: string;
           type?: NotificationType;
@@ -222,6 +225,14 @@ export interface Database {
           worker_id?: string;
           error?: string;
         };
+      };
+      accept_job: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_cover_note?: string | null;
+        };
+        Returns: { success: boolean; conflict?: boolean; error?: string; job?: Json };
       };
     };
   };

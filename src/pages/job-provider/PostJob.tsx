@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Briefcase, MapPin, IndianRupee, Clock, Tag, AlertTriangle, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Briefcase, MapPin, IndianRupee, Clock, Tag, AlertTriangle, CheckCircle, Loader2, ArrowLeft, Search, Navigation, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { jobsService } from '../../services/jobs';
+import { useTranslation } from 'react-i18next';
+import { resolveLocation } from '../../utils/locations';
+import MapView from '../../components/MapView';
 
 const CATEGORIES = [
   'cleaning', 'construction', 'delivery', 'cooking', 'gardening',
@@ -36,6 +39,7 @@ const LOCATION_PRESETS = [
 
 export const PostJob: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -52,6 +56,10 @@ export const PostJob: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [locationQuery, setLocationQuery] = useState(LOCATION_PRESETS[0].label);
+  const [jobLocation, setJobLocation] = useState({ lat: LOCATION_PRESETS[0].lat, lng: LOCATION_PRESETS[0].lng });
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   const toggleSkill = (s: string) =>
     setForm((f) => ({
@@ -69,8 +77,44 @@ export const PostJob: React.FC = () => {
         : [...f.selected_hazards, h],
     }));
 
-  const handleLocationChange = (idx: number) => {
-    setForm((f) => ({ ...f, location_preset: idx, address: LOCATION_PRESETS[idx].label }));
+  const handleLocationSearch = () => {
+    const resolved = resolveLocation(locationQuery);
+    if (!resolved) {
+      setLocationError(`Location "${locationQuery}" not found. Try Malviya Nagar, Saket, or Hauz Khas.`);
+      return;
+    }
+    setJobLocation(resolved);
+    setLocationError(null);
+    setForm((f) => ({ ...f, address: locationQuery.trim() }));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGeoLoading(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setJobLocation(location);
+        setLocationQuery('Current location');
+        setForm((f) => ({ ...f, address: `Current location (${location.lat.toFixed(5)}, ${location.lng.toFixed(5)})` }));
+        setGeoLoading(false);
+      },
+      (geoError) => {
+        setLocationError(geoError.code === 1 ? 'Location permission denied. Search for an address instead.' : 'Could not get your location.');
+        setGeoLoading(false);
+      },
+      { timeout: 10000, enableHighAccuracy: false },
+    );
+  };
+
+  const handlePinSelect = (location: { lat: number; lng: number }) => {
+    setJobLocation(location);
+    setLocationQuery('Pinned location');
+    setForm((f) => ({ ...f, address: `Pinned location (${location.lat.toFixed(5)}, ${location.lng.toFixed(5)})` }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,7 +132,6 @@ export const PostJob: React.FC = () => {
 
     setSubmitting(true);
     setError(null);
-    const loc = LOCATION_PRESETS[form.location_preset];
     try {
       await jobsService.createJob({
         provider_id: user.id,
@@ -97,8 +140,8 @@ export const PostJob: React.FC = () => {
         category: form.category,
         wage: wageNum,
         wage_type: form.wage_type,
-        lat: loc.lat,
-        lng: loc.lng,
+        lat: jobLocation.lat,
+        lng: jobLocation.lng,
         address: form.address.trim(),
         required_skills: form.selected_skills,
         hazards: form.selected_hazards,
@@ -150,8 +193,8 @@ export const PostJob: React.FC = () => {
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Post a Job</h1>
-          <p className="text-xs text-slate-500">Create a new listing for nearby workers</p>
+          <h1 className="text-xl font-bold text-slate-900">{t('postJob')}</h1>
+          <p className="text-xs text-slate-500">{t('postJobDescription')}</p>
         </div>
       </div>
 
@@ -167,7 +210,7 @@ export const PostJob: React.FC = () => {
         {/* Title */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Job Title <span className="text-red-500">*</span>
+            {t('jobTitle')} <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -184,7 +227,7 @@ export const PostJob: React.FC = () => {
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Description</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('description')}</label>
           <textarea
             placeholder="Describe the work, timing, special requirements…"
             value={form.description}
@@ -197,7 +240,7 @@ export const PostJob: React.FC = () => {
         {/* Category */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Category <span className="text-red-500">*</span>
+            {t('category')} <span className="text-red-500">*</span>
           </label>
           <select
             value={form.category}
@@ -216,7 +259,7 @@ export const PostJob: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Wage (₹) <span className="text-red-500">*</span>
+              {t('wage')} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -232,7 +275,7 @@ export const PostJob: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Pay Type</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('payType')}</label>
             <div className="relative">
               <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <select
@@ -248,29 +291,10 @@ export const PostJob: React.FC = () => {
           </div>
         </div>
 
-        {/* Location */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Location <span className="text-red-500">*</span>
-          </label>
-          <div className="relative mb-2">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <select
-              value={form.location_preset}
-              onChange={(e) => handleLocationChange(Number(e.target.value))}
-              className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent transition-all"
-            >
-              {LOCATION_PRESETS.map((loc, i) => (
-                <option key={i} value={i}>{loc.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         {/* Required Skills */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1">
-            <Tag className="w-3.5 h-3.5" /> Required Skills
+            <Tag className="w-3.5 h-3.5" /> {t('requiredSkills')}
           </label>
           <div className="flex flex-wrap gap-2">
             {SKILL_OPTIONS.map((s) => (
@@ -293,7 +317,7 @@ export const PostJob: React.FC = () => {
         {/* Hazards */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Hazard Disclosures
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> {t('hazardDisclosures')}
           </label>
           <div className="flex flex-wrap gap-2">
             {HAZARD_OPTIONS.map((h) => (
@@ -314,6 +338,46 @@ export const PostJob: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1.5">Be transparent — workers filter jobs by hazards they can't handle.</p>
         </div>
 
+        {/* Exact job location: keep this as the final decision before posting. */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3">
+          <div>
+            <label className="block text-sm font-bold text-slate-900">{t('whereJobLocated')}</label>
+            <p className="text-xs text-slate-500 mt-1">{t('locationPickerDescription')}</p>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={t('searchByLocation')}
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
+                className="w-full pl-9 pr-9 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-primary-300"
+              />
+              {locationQuery && <button type="button" onClick={() => setLocationQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="w-3.5 h-3.5 text-slate-400" /></button>}
+            </div>
+            <button type="button" onClick={handleLocationSearch} className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl"><Search className="w-4 h-4" /></button>
+          </div>
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={geoLoading}
+            className="text-xs text-primary-600 font-semibold hover:underline flex items-center gap-1 disabled:opacity-50"
+          >
+            <Navigation className="w-3 h-3" />
+            {geoLoading ? t('gettingLocation') : t('useCurrentLocation')}
+          </button>
+          {locationError && <p className="text-xs text-red-500">{locationError}</p>}
+          <MapView
+            center={jobLocation}
+            jobMarkers={[]}
+            singleMarker
+            onLocationSelect={handlePinSelect}
+          />
+          <p className="text-xs text-slate-500">{t('selectedLocation')}: <span className="font-medium text-slate-700">{form.address}</span></p>
+        </div>
+
         {/* Submit */}
         <button
           type="submit"
@@ -326,7 +390,7 @@ export const PostJob: React.FC = () => {
               Posting…
             </>
           ) : (
-            'Post Job'
+            t('postJob')
           )}
         </button>
       </form>

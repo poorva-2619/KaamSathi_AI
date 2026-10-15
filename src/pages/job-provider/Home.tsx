@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { Briefcase, PlusCircle, BarChart2, CheckCircle, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { jobsService } from '../../services/jobs';
+import { useTranslation } from 'react-i18next';
 
 export const Home: React.FC = () => {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const [counts, setCounts] = useState<{ posted: number; completed: number } | null>(null);
 
   useEffect(() => {
@@ -19,11 +21,11 @@ export const Home: React.FC = () => {
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 md:pb-6">
       {/* Hero header */}
       <div className="bg-white border-b border-slate-200 px-4 pt-6 pb-5">
-        <p className="text-xs text-primary-600 font-semibold tracking-wide uppercase mb-1">Job Provider</p>
+        <p className="text-xs text-primary-600 font-semibold tracking-wide uppercase mb-1">{t('jobProvider')}</p>
         <h1 className="text-2xl font-bold text-slate-900">
           Hello, <span className="text-primary-600">{firstName}</span> 👋
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Manage your listings and find the right workers.</p>
+        <p className="text-sm text-slate-500 mt-1">{t('jobProviderHomeDescription')}</p>
       </div>
 
       <div className="px-4 pt-5 max-w-2xl mx-auto space-y-4">
@@ -34,7 +36,7 @@ export const Home: React.FC = () => {
               <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
                 <Briefcase className="w-4 h-4 text-primary-500" />
               </div>
-              <span className="text-xs text-slate-500 font-medium">Posted</span>
+              <span className="text-xs text-slate-500 font-medium">{t('posted')}</span>
             </div>
             <p className="text-2xl font-bold text-slate-900">
               {counts === null ? (
@@ -47,7 +49,7 @@ export const Home: React.FC = () => {
               <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-4 h-4 text-green-500" />
               </div>
-              <span className="text-xs text-slate-500 font-medium">Completed</span>
+              <span className="text-xs text-slate-500 font-medium">{t('completed')}</span>
             </div>
             <p className="text-2xl font-bold text-slate-900">
               {counts === null ? (
@@ -67,7 +69,7 @@ export const Home: React.FC = () => {
               <PlusCircle className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-semibold text-sm">Post a Job</p>
+              <p className="font-semibold text-sm">{t('postJob')}</p>
               <p className="text-xs text-primary-200">Create a new listing for workers</p>
             </div>
           </Link>
@@ -80,7 +82,7 @@ export const Home: React.FC = () => {
               <BarChart2 className="w-5 h-5 text-primary-500" />
             </div>
             <div>
-              <p className="font-semibold text-sm">My Jobs</p>
+              <p className="font-semibold text-sm">{t('myJobs')}</p>
               <p className="text-xs text-slate-500">Review applications and manage listings</p>
             </div>
           </Link>
@@ -93,7 +95,7 @@ export const Home: React.FC = () => {
               <Bell className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className="font-semibold text-sm">Messages</p>
+              <p className="font-semibold text-sm">{t('messages')}</p>
               <p className="text-xs text-slate-500">Chat with workers on accepted jobs</p>
             </div>
           </Link>

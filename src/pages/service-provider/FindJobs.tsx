@@ -1,40 +1,16 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Filter, AlertTriangle, RefreshCw, Briefcase, IndianRupee, X } from 'lucide-react';
+import { Search, MapPin, Filter, AlertTriangle, RefreshCw, Briefcase, X, Navigation, Map as MapIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { jobsService, type JobRow } from '../../services/jobs';
+import { supabase } from '../../services/supabase';
+import { resolveLocation } from '../../utils/locations';
+import { calculateHaversineDistance } from '../../utils/distance';
+import { scoreJob } from '../../utils/recommendation';
+import { useTranslation } from 'react-i18next';
 
-// Simple distance calc (Haversine)
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Hardcoded location lookup (matches seed data locations)
-const LOCATION_LOOKUP: Record<string, { lat: number; lng: number }> = {
-  'malviya nagar': { lat: 28.5355, lng: 77.209 },
-  'saket': { lat: 28.5244, lng: 77.2167 },
-  'lajpat nagar': { lat: 28.567, lng: 77.243 },
-  'hauz khas': { lat: 28.5494, lng: 77.2001 },
-  'green park': { lat: 28.5601, lng: 77.2089 },
-  'new delhi': { lat: 28.6139, lng: 77.209 },
-  'delhi': { lat: 28.6139, lng: 77.209 },
-};
-
-function resolveLocation(query: string): { lat: number; lng: number } | null {
-  const normalized = query.toLowerCase().trim();
-  for (const [key, coords] of Object.entries(LOCATION_LOOKUP)) {
-    if (normalized.includes(key)) return coords;
-  }
-  return null;
-}
+// Lazy-load MapView so Leaflet CSS isn't bundled when the map is hidden
+const MapView = React.lazy(() => import('../../components/MapView'));
 
 const HAZARD_OPTIONS = [
   'dust', 'heavy_lifting', 'travel', 'heat', 'outdoor',
@@ -45,12 +21,15 @@ const WAGE_TYPE_LABEL: Record<string, string> = {
   daily: '/day', hourly: '/hr', fixed: ' fixed',
 };
 
+/* ─── Inline JobCard (rich, full-featured) ─────────────────────────── */
 const JobCard: React.FC<{
   job: JobRow;
   distanceKm: number | null;
+  matchScore: number | null;
+  matchReasons: string[];
   hazardsAvoided: string[];
   onPress: () => void;
-}> = ({ job, distanceKm, hazardsAvoided, onPress }) => {
+}> = ({ job, distanceKm, matchScore, matchReasons, hazardsAvoided, onPress }) => {
   const conflictingHazards = job.hazards.filter((h) => hazardsAvoided.includes(h));
   const isHazardous = conflictingHazards.length > 0;
 
@@ -87,6 +66,22 @@ const JobCard: React.FC<{
         </div>
       </div>
 
+      {/* Match score badge */}
+      {matchScore !== null && matchScore > 0 && (
+        <div className="flex items-center gap-2 mt-2">
+          <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            matchScore >= 80 ? 'bg-green-100 text-green-700' :
+            matchScore >= 50 ? 'bg-amber-100 text-amber-700' :
+            'bg-slate-100 text-slate-500'
+          }`}>
+            {matchScore}% match
+          </div>
+          {matchReasons.slice(0, 2).map((r, i) => (
+            <span key={i} className="text-[10px] text-slate-400">{r}</span>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5 mt-2.5">
         <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full capitalize">{job.category}</span>
         {job.required_skills.slice(0, 3).map((s) => (
@@ -97,8 +92,10 @@ const JobCard: React.FC<{
   );
 };
 
+/* ─── Main Component ───────────────────────────────────────────────── */
 export const FindJobs: React.FC = () => {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [jobs, setJobs] = useState<JobRow[]>([]);
@@ -106,12 +103,17 @@ export const FindJobs: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [locationQuery, setLocationQuery] = useState('');
-  const [resolvedLocation, setResolvedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [resolvedLocation, setResolvedLocation] = useState<{ lat: number; lng: number }>({
+    lat: profile?.lat ?? 28.5355,
+    lng: profile?.lng ?? 77.2090,
+  });
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [avoidHazards, setAvoidHazards] = useState<string[]>(profile?.hazards_avoided ?? []);
   const [showHazardous, setShowHazardous] = useState(false);
+  const [showMap, setShowMap] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,14 +130,27 @@ export const FindJobs: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('jobs-status-for-worker-list')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jobs' }, (payload) => {
+        if ((payload.new as JobRow).status !== 'open') {
+          setJobs((current) => current.filter((job) => job.id !== (payload.new as JobRow).id));
+        }
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
   // Sync avoidHazards with profile when it loads
   useEffect(() => {
     if (profile?.hazards_avoided) setAvoidHazards(profile.hazards_avoided);
   }, [profile?.hazards_avoided]);
 
+  /* ── Location handling ──────────────────────────────────────────── */
   const handleLocationSearch = () => {
     if (!locationQuery.trim()) {
-      setResolvedLocation(null);
+      setResolvedLocation({ lat: profile?.lat ?? 28.5355, lng: profile?.lng ?? 77.2090 });
       setLocationError(null);
       return;
     }
@@ -144,43 +159,87 @@ export const FindJobs: React.FC = () => {
       setResolvedLocation(loc);
       setLocationError(null);
     } else {
-      setResolvedLocation(null);
       setLocationError(`Location "${locationQuery}" not found. Try: Malviya Nagar, Saket, Hauz Khas…`);
     }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGeoLoading(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setResolvedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocationQuery('📍 Current location');
+        setGeoLoading(false);
+      },
+      (err) => {
+        setLocationError(err.code === 1 ? 'Location permission denied. Use manual search instead.' : 'Could not get your location. Try manual search.');
+        setGeoLoading(false);
+      },
+      { timeout: 10000, enableHighAccuracy: false },
+    );
   };
 
   const toggleHazardFilter = (h: string) =>
     setAvoidHazards((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]);
 
+  /* ── Scoring & filtering ────────────────────────────────────────── */
   const enrichedJobs = useMemo(() => {
-    return jobs.map((job) => ({
-      job,
-      distanceKm: resolvedLocation
-        ? haversineKm(resolvedLocation.lat, resolvedLocation.lng, job.lat, job.lng)
-        : null,
-      isHazardous: job.hazards.some((h) => avoidHazards.includes(h)),
-    }));
-  }, [jobs, resolvedLocation, avoidHazards]);
+    // Build a minimal worker profile for scoring
+    const workerProfile = {
+      id: profile?.id ?? '',
+      skills: profile?.skills ?? [],
+      gender: (profile as any)?.gender ?? '',
+      hazards_avoided: avoidHazards,
+      max_distance_km: profile?.max_distance_km ?? 20,
+      lat: resolvedLocation?.lat ?? profile?.lat ?? undefined,
+      lng: resolvedLocation?.lng ?? profile?.lng ?? undefined,
+    };
+
+    return jobs.map((job) => {
+      const distanceKm = resolvedLocation
+        ? Math.round(calculateHaversineDistance(resolvedLocation.lat, resolvedLocation.lng, job.lat, job.lng) * 10) / 10
+        : null;
+
+      const result = scoreJob(workerProfile, job as any, distanceKm ?? undefined);
+
+      return {
+        job,
+        distanceKm,
+        isHazardous: result.hidden ?? false,
+        matchScore: result.score,
+        matchReasons: result.reasons,
+      };
+    });
+  }, [jobs, resolvedLocation, avoidHazards, profile]);
 
   const displayedJobs = useMemo(() => {
     let filtered = enrichedJobs;
     if (!showHazardous) {
       filtered = filtered.filter((e) => !e.isHazardous);
     }
-    // Sort: nearest first if location set, else newest
-    if (resolvedLocation) {
-      filtered = [...filtered].sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
-    }
+    // Sort by match score (desc), then by distance (asc)
+    filtered = [...filtered].sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      return (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999);
+    });
     return filtered;
-  }, [enrichedJobs, showHazardous, resolvedLocation]);
+  }, [enrichedJobs, showHazardous]);
 
   const hiddenCount = enrichedJobs.filter((e) => e.isHazardous).length;
+
+  // Jobs within display range for the map
+  const mapJobs = useMemo(() => displayedJobs.map((e) => e.job), [displayedJobs]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-50 pb-20 md:pb-6">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 pt-6 pb-4">
-        <h1 className="text-xl font-bold text-slate-900 mb-3">Find Jobs</h1>
+        <h1 className="text-xl font-bold text-slate-900 mb-3">{t('findJobs')}</h1>
 
         {/* Location search */}
         <div className="flex gap-2">
@@ -188,14 +247,14 @@ export const FindJobs: React.FC = () => {
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by location (e.g. Malviya Nagar)…"
+              placeholder={t('searchByLocation')}
               value={locationQuery}
               onChange={(e) => setLocationQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLocationSearch()}
               className="w-full pl-9 pr-4 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-primary-300 transition-all"
             />
             {locationQuery && (
-              <button onClick={() => { setLocationQuery(''); setResolvedLocation(null); setLocationError(null); }} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <button onClick={() => { setLocationQuery(''); setResolvedLocation({ lat: profile?.lat ?? 28.5355, lng: profile?.lng ?? 77.2090 }); setLocationError(null); }} className="absolute right-2 top-1/2 -translate-y-1/2">
                 <X className="w-3.5 h-3.5 text-slate-400" />
               </button>
             )}
@@ -219,12 +278,35 @@ export const FindJobs: React.FC = () => {
           </button>
         </div>
 
+        {/* Use current location + toggle map */}
+        <div className="flex items-center gap-3 mt-2">
+          <button
+            onClick={handleUseCurrentLocation}
+            disabled={geoLoading}
+            className="text-xs text-primary-600 font-semibold hover:underline flex items-center gap-1 disabled:opacity-50"
+          >
+            <Navigation className="w-3 h-3" />
+            {geoLoading ? t('gettingLocation') : t('useCurrentLocation')}
+          </button>
+          {resolvedLocation && (
+            <button
+              onClick={() => setShowMap((m) => !m)}
+              className={`text-xs font-semibold flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${
+                showMap ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-slate-200 text-slate-500 hover:border-primary-200'
+              }`}
+            >
+              <MapIcon className="w-3 h-3" />
+              {showMap ? 'Hide map' : 'Show map'}
+            </button>
+          )}
+        </div>
+
         {locationError && (
           <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" />{locationError}
           </p>
         )}
-        {resolvedLocation && !locationError && (
+        {locationQuery && resolvedLocation && !locationError && (
           <p className="text-xs text-green-600 mt-2">📍 Showing jobs near {locationQuery}</p>
         )}
 
@@ -266,6 +348,19 @@ export const FindJobs: React.FC = () => {
         )}
       </div>
 
+      {/* Map view (lazy-loaded, only when location is resolved and toggle is on) */}
+      {showMap && resolvedLocation && (
+        <div className="px-4 pt-4 max-w-2xl mx-auto">
+          <React.Suspense fallback={<div className="h-[40vh] bg-slate-200 rounded-xl animate-pulse flex items-center justify-center text-slate-400 text-sm">Loading map…</div>}>
+            <MapView
+              center={resolvedLocation}
+              jobMarkers={mapJobs}
+              onMarkerClick={(job) => navigate(`/service-provider/job/${job.id}`, { state: { job } })}
+            />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* Job list */}
       <div className="px-4 pt-4 max-w-2xl mx-auto space-y-3">
         {/* Hazard filter banner */}
@@ -276,7 +371,13 @@ export const FindJobs: React.FC = () => {
           </div>
         )}
 
+        {/* Job count */}
+        {!loading && !error && displayedJobs.length > 0 && (
+          <p className="text-xs text-slate-500 font-medium">{displayedJobs.length} job{displayedJobs.length !== 1 ? 's' : ''} available</p>
+        )}
+
         {loading ? (
+          /* Skeleton / shimmer loading cards */
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 animate-pulse">
               <div className="flex justify-between gap-4">
@@ -309,7 +410,7 @@ export const FindJobs: React.FC = () => {
             <h3 className="font-semibold text-slate-800">No jobs available</h3>
             <p className="text-sm text-slate-500 mt-1">
               {avoidHazards.length > 0
-                ? 'All nearby jobs contain hazards you've marked to avoid. Try adjusting your filters.'
+                ? "All nearby jobs contain hazards you've marked to avoid. Try adjusting your filters."
                 : 'No open jobs right now. Check back soon!'}
             </p>
             {avoidHazards.length > 0 && (
@@ -322,11 +423,13 @@ export const FindJobs: React.FC = () => {
             )}
           </div>
         ) : (
-          displayedJobs.map(({ job, distanceKm, isHazardous }) => (
+          displayedJobs.map(({ job, distanceKm, matchScore, matchReasons }) => (
             <JobCard
               key={job.id}
               job={job}
               distanceKm={distanceKm}
+              matchScore={matchScore}
+              matchReasons={matchReasons}
               hazardsAvoided={avoidHazards}
               onPress={() => navigate(`/service-provider/job/${job.id}`, { state: { job } })}
             />
