@@ -2,10 +2,29 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Briefcase, UserCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
+import { isProfileComplete } from '../utils/profileMeta';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user, profile } = useAuth();
+
+  const handleHireWorker = () => {
+    if (user && isProfileComplete(profile)) {
+      navigate('/job-provider');
+    } else {
+      navigate('/signup?role=job_provider');
+    }
+  };
+
+  const handleFindWork = () => {
+    if (user && isProfileComplete(profile)) {
+      navigate('/service-provider');
+    } else {
+      navigate('/signup?role=service_provider');
+    }
+  };
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-[radial-gradient(circle_at_15%_10%,_#ffedd5_0,_transparent_32%),radial-gradient(circle_at_90%_85%,_#ccfbf1_0,_transparent_30%),linear-gradient(145deg,_#fffaf5_0%,_#ffffff_55%,_#f8fafc_100%)]">
@@ -34,7 +53,7 @@ export const Landing: React.FC = () => {
           
           {/* Hire a Worker Card */}
           <button
-            onClick={() => navigate('/signup?role=job_provider')}
+            onClick={handleHireWorker}
             className="group relative min-h-[132px] p-6 bg-primary-600 hover:bg-primary-700 active:scale-[0.99] rounded-3xl text-white shadow-xl shadow-orange-500/25 transition-all duration-200 flex flex-col justify-between overflow-hidden border border-orange-500 text-left"
           >
             <div className="flex items-start justify-between w-full mb-2">
@@ -54,7 +73,7 @@ export const Landing: React.FC = () => {
 
           {/* Find Work Card */}
           <button
-            onClick={() => navigate('/signup?role=service_provider')}
+            onClick={handleFindWork}
             className="group relative min-h-[132px] p-6 bg-white/90 hover:bg-white active:scale-[0.99] rounded-3xl text-slate-900 shadow-lg shadow-slate-200/70 border-2 border-slate-200 hover:border-teal-300 transition-all duration-200 flex flex-col justify-between text-left backdrop-blur-sm"
           >
             <div className="flex items-start justify-between w-full mb-2">
