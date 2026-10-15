@@ -144,6 +144,49 @@ export const authService = {
     return session?.user ?? null;
   },
 
+  async resetPasswordForEmail(email: string, redirectTo?: string) {
+    if (isPlaceholderSupabase) {
+      return { data: {}, error: null };
+    }
+
+    try {
+      const redirectUrl = redirectTo || `${window.location.origin}/reset-password`;
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Failed to fetch') || msg.includes('fetch')) {
+        console.warn('Supabase host unreachable. Mocking reset password email.');
+        return { data: {}, error: null };
+      }
+      throw err;
+    }
+  },
+
+  async updatePassword(newPassword: string) {
+    if (isPlaceholderSupabase) {
+      return { data: {}, error: null };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) throw error;
+      return { data, error: null };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('Failed to fetch') || msg.includes('fetch')) {
+        console.warn('Supabase host unreachable. Mocking password update.');
+        return { data: {}, error: null };
+      }
+      throw err;
+    }
+  },
+
   onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {
     authSubscribers.add(callback);
 

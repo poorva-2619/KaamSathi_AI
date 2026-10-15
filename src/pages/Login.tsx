@@ -142,6 +142,12 @@ export const Login: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-700">
                 {t('password')}
               </label>
+              <Link
+                to="/forgot-password"
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium hover:underline transition-colors"
+              >
+                {t('forgotPassword', 'Forgot Password?')}
+              </Link>
             </div>
             <input
               type="password"

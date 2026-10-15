@@ -111,5 +111,20 @@
   "jobAcceptedNotification": "कामगार ने आपका काम स्वीकार किया",
   "newJobNotification": "नया काम उपलब्ध है",
   "couldNotRespond": "जवाब नहीं मिल सका — फिर कोशिश करें",
-  "assistantSystemLanguage": "हिंदी (देवनागरी) में जवाब दें।"
+  "assistantSystemLanguage": "हिंदी (देवनागरी) में जवाब दें।",
+  "forgotPassword": "पासवर्ड भूल गए?",
+  "forgotPasswordTitle": "पासवर्ड रीसेट करें",
+  "forgotPasswordSubtitle": "अपना ईमेल दर्ज करें और हम आपको एक पासवर्ड रीसेट लिंक भेजेंगे।",
+  "sendResetLink": "रीसेट लिंक भेजें",
+  "sendingResetLink": "रीसेट लिंक भेजा जा रहा है...",
+  "resetLinkSent": "रीसेट लिंक भेजा गया",
+  "resetLinkSentMessage": "अपना पासवर्ड रीसेट करने के निर्देशों के लिए अपना ईमेल जांचें। यदि कुछ मिनटों में नहीं आता है, तो स्पैम फ़ोल्डर देखें।",
+  "backToLogin": "लॉग इन पर वापस जाएं",
+  "newPassword": "नया पासवर्ड",
+  "newPasswordPlaceholder": "नया पासवर्ड दर्ज करें (न्यूनतम 6 अक्षर)",
+  "confirmNewPassword": "नए पासवर्ड की पुष्टि करें",
+  "updatePassword": "पासवर्ड अपडेट करें",
+  "updatingPassword": "पासवर्ड अपडेट किया जा रहा है...",
+  "passwordUpdated": "पासवर्ड सफलतापूर्वक अपडेट हो गया!",
+  "passwordUpdatedSubtitle": "आपका पासवर्ड बदल दिया गया है। अब आप अपने नए पासवर्ड से लॉग इन कर सकते हैं।"
 }

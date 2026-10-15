@@ -111,5 +111,20 @@
   "jobAcceptedNotification": "Worker accepted your job",
   "newJobNotification": "New Job Available",
   "couldNotRespond": "Couldn't get a response — try again",
-  "assistantSystemLanguage": "Respond in English."
+  "assistantSystemLanguage": "Respond in English.",
+  "forgotPassword": "Forgot Password?",
+  "forgotPasswordTitle": "Reset Password",
+  "forgotPasswordSubtitle": "Enter your email address and we'll send you a password reset link.",
+  "sendResetLink": "Send Reset Link",
+  "sendingResetLink": "Sending reset link...",
+  "resetLinkSent": "Reset Link Sent",
+  "resetLinkSentMessage": "Check your email for instructions to reset your password. If it doesn't appear in a few minutes, check your spam folder.",
+  "backToLogin": "Back to Log In",
+  "newPassword": "New Password",
+  "newPasswordPlaceholder": "Enter new password (min. 6 characters)",
+  "confirmNewPassword": "Confirm New Password",
+  "updatePassword": "Update Password",
+  "updatingPassword": "Updating password...",
+  "passwordUpdated": "Password Updated Successfully!",
+  "passwordUpdatedSubtitle": "Your password has been changed. You can now log in with your new password."
 }
